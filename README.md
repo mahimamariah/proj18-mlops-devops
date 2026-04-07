@@ -1,6 +1,9 @@
 # DevOps MLOps Platform (Kubernetes)
 
-
+Course: ML Systems Design & Operations
+Team: Bias & Variance
+Role: Devops (mx2431) Mahima Mariah
+Project: Personalized recipe recommendations for Mealie
 ## Overview
 This repository contains Kubernetes-based infrastructure (IaC) for deploying an ML platform on Chameleon Cloud.
 
