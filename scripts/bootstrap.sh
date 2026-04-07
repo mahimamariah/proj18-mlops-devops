@@ -13,8 +13,8 @@ if [ ! -d "k8s" ]; then
   exit 1
 fi
 
-if [ ! -f "scripts/create-secrets.sh" ]; then
-  echo "Error: scripts/create-secrets.sh not found."
+if [ ! -f "../scripts/create-secrets.sh" ]; then
+  echo "Error: ../ scripts/create-secrets.sh not found."
   exit 1
 fi
 
@@ -25,8 +25,8 @@ echo "=== Applying namespaces ==="
 kubectl apply -f k8s/namespaces.yaml
 
 echo "=== Creating secrets ==="
-chmod +x scripts/create-secrets.sh
-./scripts/create-secrets.sh
+chmod + x ../ scripts/create-secrets.sh
+../scripts/create-secrets.sh
 
 echo "=== Deploying platform services ==="
 kubectl apply -f k8s/postgres-statefulset.yaml
