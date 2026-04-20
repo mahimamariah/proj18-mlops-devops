@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: batch-compile-datasets
+  namespace: data
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: batch-compile-datasets
+              image: ghcr.io/YOUR_ORG/mealie-data-batch:latest
+              env:
+                - name: DATA_BUCKET
+                  value: training-data
+                - name: FEATURE_BUCKET
+                  value: feature-store
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-secret
+                      key: accesskey
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-secret
+                      key: secretkey
+                - name: S3_ENDPOINT_URL
+                  value: http://minio-service.platform.svc.cluster.local:9000

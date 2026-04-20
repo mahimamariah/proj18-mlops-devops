@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feature-service
+  namespace: data
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: feature-service
+  template:
+    metadata:
+      labels:
+        app: feature-service
+    spec:
+      containers:
+        - name: feature-service
+          image: ghcr.io/YOUR_ORG/mealie-data-feature:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: FEATURE_BUCKET
+              value: feature-store
+            - name: DATA_BUCKET
+              value: training-data
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: accesskey
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: secretkey
+            - name: S3_ENDPOINT_URL
+              value: http://minio-service.platform.svc.cluster.local:9000
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: feature-service
+  namespace: data
+spec:
+  type: ClusterIP
+  selector:
+    app: feature-service
+  ports:
+    - port: 8080
+      targetPort: 8080
