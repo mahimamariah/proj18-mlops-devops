@@ -45,6 +45,8 @@ The system uses ALS (Alternating Least Squares) collaborative filtering to rank 
 
 ```
 .
+├── infrastructure/
+│   └── k8s/                             # Legacy manifests (superseded by k8s/)
 ├── k8s/
 │   ├── namespaces.yaml                  # platform, mealie, serving, data, training, monitoring
 │   ├── postgres-statefulset.yaml        # PostgreSQL database (StatefulSet + PVC)
@@ -77,8 +79,7 @@ The system uses ALS (Alternating Least Squares) collaborative filtering to rank 
 ├── scripts/
 │   ├── bootstrap.sh                     # Full system bootstrap
 │   ├── create-secrets.sh                # Kubernetes secrets setup
-│   ├── collect-evidence.sh              # Evidence collection script
-│   └── teardown.sh                      # Full system teardown
+│   └── collect-evidence.sh              # Evidence collection script
 ├── SAFEGUARDING.md                      # Safeguarding plan
 └── README.md
 ```
