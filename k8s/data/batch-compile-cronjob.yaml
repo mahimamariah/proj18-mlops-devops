@@ -12,12 +12,24 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: batch-compile-datasets
-              image: ghcr.io/YOUR_ORG/mealie-data-batch:latest
+              image: mahimamariah/batch-compile-datasets:latest
               env:
-                - name: DATA_BUCKET
+                - name: BUCKET_NAME
                   value: training-data
-                - name: FEATURE_BUCKET
-                  value: feature-store
+                - name: POSTGRES_HOST
+                  value: postgres.platform.svc.cluster.local
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgres-secret
+                      key: username
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgres-secret
+                      key: password
+                - name: POSTGRES_DB
+                  value: mealie
                 - name: AWS_ACCESS_KEY_ID
                   valueFrom:
                     secretKeyRef:
@@ -28,5 +40,5 @@ spec:
                     secretKeyRef:
                       name: minio-secret
                       key: secretkey
-                - name: S3_ENDPOINT_URL
+                - name: S3_ENDPOINT
                   value: http://minio-service.platform.svc.cluster.local:9000

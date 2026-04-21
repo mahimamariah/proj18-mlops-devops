@@ -12,7 +12,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: monthly-retrain
-              image: ghcr.io/YOUR_ORG/mealie-training:latest
+              image: shashwatshah02/mealie-als-training:latest
               args:
                 - python
                 - train.py
@@ -35,8 +35,8 @@ spec:
                   value: http://minio-service.platform.svc.cluster.local:9000
               resources:
                 requests:
-                  cpu: "1"
-                  memory: "2Gi"
+                  cpu: "100m"
+                  memory: "256Mi"
                 limits:
-                  cpu: "2"
-                  memory: "4Gi"
+                  cpu: "500m"
+                  memory: "512Mi"

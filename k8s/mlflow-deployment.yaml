@@ -34,7 +34,11 @@ spec:
           args:
             - |
               python -m pip install --no-cache-dir psycopg2-binary boto3 &&
-              mlflow server --backend-store-uri "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres.platform.svc.cluster.local:5432/mlflow" --default-artifact-root "s3://mlflow" --host 0.0.0.0 --port 5000
+              mlflow server \
+                --backend-store-uri "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres.platform.svc.cluster.local:5432/mlflow" \
+                --default-artifact-root "s3://mlflow" \
+                --host 0.0.0.0 \
+                --port 5000
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -60,6 +64,26 @@ spec:
               value: http://minio-service.platform.svc.cluster.local:9000
           ports:
             - containerPort: 5000
+          startupProbe:
+            tcpSocket:
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket:
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
           volumeMounts:
             - name: mlflow-data
               mountPath: /mlflow

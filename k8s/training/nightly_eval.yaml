@@ -14,7 +14,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: nightly-eval
-              image: bm3986/mealie-nightly-eval:latest
+              image: mahimamariah/mealie-nightly-eval:latest
               imagePullPolicy: Always
               env:
                 - name: MINIO_ENDPOINT
@@ -49,8 +49,8 @@ spec:
                   value: mealie
               resources:
                 requests:
-                  cpu: "250m"
-                  memory: "512Mi"
+                  cpu: "100m"
+                  memory: "256Mi"
                 limits:
-                  cpu: "1"
-                  memory: "1Gi"
+                  cpu: "500m"
+                  memory: "512Mi"
