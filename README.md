@@ -34,6 +34,7 @@ The system uses ALS (Alternating Least Squares) collaborative filtering to rank 
 │  │  - nightly-eval (3am)   │                            │
 │  │  - monthly-retrain (1st)│                            │
 │  │  - batch-compile (2am)  │                            │
+│  │  - model-promoter (*/6h)│                            │
 │  └─────────────────────────┘                            │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -46,11 +47,13 @@ The system uses ALS (Alternating Least Squares) collaborative filtering to rank 
 .
 ├── k8s/
 │   ├── namespaces.yaml                  # platform, mealie, serving, data, training, monitoring
-│   ├── postgres-statefulset.yaml        # PostgreSQL database
+│   ├── postgres-statefulset.yaml        # PostgreSQL database (StatefulSet + PVC)
 │   ├── minio-deployment.yaml            # MinIO object storage
 │   ├── minio-init-job.yaml              # MinIO bucket initialization
 │   ├── mlflow-deployment.yaml           # MLflow experiment tracking
 │   ├── mealie-deployment.yaml           # Mealie recipe manager
+│   ├── model-promoter-cronjob.yaml      # Automated model promotion (staging→canary→prod)
+│   ├── batch-compile-cronjob.yaml       # Batch dataset compilation CronJob
 │   ├── data/
 │   │   ├── feature-service.yaml         # Feature engineering service
 │   │   └── batch-compile-cronjob.yaml   # Nightly batch data compilation
@@ -106,7 +109,7 @@ The system uses ALS (Alternating Least Squares) collaborative filtering to rank 
 
 ```bash
 git clone https://github.com/mahimamariah/proj18-mlops-devops.git
-cd proj18-mlops-devops/infrastructure
+cd proj18-mlops-devops
 
 bash scripts/bootstrap.sh
 ```
@@ -118,6 +121,17 @@ This will:
 4. Deploy Mealie
 5. Deploy serving, data, and training workloads
 6. Print all service URLs
+
+### Deployment Order
+
+Resources are deployed in the following order:
+
+1. **Namespaces** → logical isolation of services
+2. **Secrets** → credentials for all services
+3. **Platform services** (Postgres, MinIO, MLflow) → foundational dependencies
+4. **Application services** (Mealie, Inference API) → depend on platform services
+5. **Batch jobs & CronJobs** → depend on model/data infrastructure
+6. **Monitoring** → Prometheus, Grafana, Alertmanager
 
 ### Tear down
 
@@ -134,6 +148,7 @@ bash scripts/teardown.sh
 | Mealie | `http://<NODE_IP>:30090` | admin / (set on first login) |
 | MLflow | `http://<NODE_IP>:30500` | — |
 | MinIO UI | `http://<NODE_IP>:30901` | (set during bootstrap) |
+| Inference API | `http://<NODE_IP>:30800` | — |
 | Prometheus | `http://<NODE_IP>:30091` | — |
 | Grafana | `http://<NODE_IP>:30300` | admin / admin123 |
 | Alertmanager | `http://<NODE_IP>:30903` | — |
@@ -144,11 +159,17 @@ bash scripts/teardown.sh
 
 ### Data
 - **Feature Service** (`data` namespace): Continuously serves features from MinIO `feature-store` bucket
-- **Batch Compile** (CronJob, 2am daily): Compiles training datasets from Mealie interaction data into MinIO `training-data` bucket
+- **Batch Compile** (CronJob, 2am daily): Compiles training datasets from Mealie interaction data into MinIO `training-data` bucket with train/val split and metadata manifest
 
 ### Training
 - **Monthly Retrain** (CronJob, 1st of month, 4am): Trains ALS model, logs to MLflow, promotes to Production if `NDCG@10 >= threshold`
 - **Nightly Eval** (CronJob, 3am daily): Validates data presence, model artifact, and inference API health. Logs results to MLflow `nightly-eval` experiment
+
+### Model Promotion
+- **Model Promoter** (CronJob, every 6 hours): Reads the latest nightly eval results from MLflow and automatically promotes models through the pipeline:
+  - `staging` → `canary` → `production`
+  - If inference API is unhealthy, automatically **rolls back** production to the last known good backup
+  - Promotion only happens if eval metrics pass all quality gates
 
 ### Serving
 - **Inference API** (`serving` namespace): Serves ALS recommendations via `/recommend` endpoint
@@ -177,6 +198,41 @@ bash scripts/teardown.sh
 
 ---
 
+## Storage & Durability
+
+- **MinIO** provides persistent object storage for MLflow artifacts and training data
+- **Postgres** is deployed as a StatefulSet with persistent volume claims
+- **MLflow** stores artifacts and metadata on persistent storage
+- No reliance on ephemeral container filesystems
+
+---
+
+## Secrets Management
+
+Secrets are created dynamically using:
+
+```bash
+bash scripts/create-secrets.sh
+```
+
+- Credentials (DB, MinIO) are stored in Kubernetes Secrets
+- No sensitive data is committed to Git
+- `.gitignore` prevents accidental leakage
+
+---
+
+## Evidence Collection
+
+To collect system validation evidence:
+
+```bash
+bash scripts/collect-evidence.sh
+```
+
+This captures pod status, resource usage, service availability, and logs for all components.
+
+---
+
 ## Safeguarding
 
 See [SAFEGUARDING.md](./SAFEGUARDING.md) for the full safeguarding plan covering fairness, transparency, privacy, robustness, and accountability.
@@ -191,150 +247,3 @@ See [SAFEGUARDING.md](./SAFEGUARDING.md) for the full safeguarding plan covering
 | Data | Bryce |
 | Training | Shashwat |
 | Serving | Sharvin |
-
-```
-kubectl apply -f infrastructure/k8s/postgres-statefulset.yaml
-kubectl apply -f infrastructure/k8s/minio-deployment.yaml
-kubectl apply -f infrastructure/k8s/mlflow-deployment.yaml
-```
-
-### Step 3: Deploy Application Services
-
-```
-kubectl apply -f infrastructure/k8s/mealie-deployment.yaml
-kubectl apply -f infrastructure/k8s/inference-deployment.yaml
-```
-
-### Step 4: Deploy Batch Jobs
-
-```
-kubectl apply -f infrastructure/k8s/nightly-eval-cronjob.yaml
-kubectl apply -f infrastructure/k8s/monthly-retrain-cronjob.yaml
-```
-
----
-
-## Deployment Order Rationale
-
-Resources are deployed in the following order:
-
-1. **Namespaces** → logical isolation of services
-2. **Platform services** (Postgres, MinIO, MLflow) → foundational dependencies
-3. **Application services** (Mealie, inference API) → depend on platform services
-4. **Batch jobs** → depend on model/data infrastructure
-
-This ensures all dependencies are available before application startup.
-
----
-
-## Repository Structure
-
-```
-proj18-mlops-devops/
-├── infrastructure/
-│   └── k8s/          # Kubernetes manifests (deployments, services, PVCs, CronJobs)
-├── scripts/          # Automation scripts (bootstrap, teardown, secrets, evidence)
-├── README.md
-```
-
----
-
-## Services Deployed
-
-### Platform Services
-
-* **Postgres** → Metadata database (StatefulSet with persistent storage)
-* **MinIO** → Object storage for ML artifacts
-* **MLflow** → Experiment tracking and model registry
-
-### Application Services
-
-* **Mealie** → Recipe management application
-* **Inference API** → ALS-based recommendation service
-
-### Batch Jobs
-
-* **nightly-eval** → Evaluates model performance (Recall@10, NDCG@10)
-* **monthly-retrain** → Retrains ALS model using updated data
-
----
-
-## Networking / Access
-
-Services are exposed using **NodePort** for simplicity in the Chameleon Cloud environment.
-
-K3s installs **Traefik** by default (ingress controller), but NodePort is used here for direct access.
-
-### Example Endpoints
-
-* Mealie UI → http://<VM_IP>:30090
-* MLflow → http://<VM_IP>:30500
-* MinIO Console → http://<VM_IP>:30901
-* Inference API → http://<VM_IP>:30800
-
----
-
-## Storage & Durability
-
-* **MinIO** provides persistent object storage for MLflow artifacts
-* **Postgres** is deployed as a StatefulSet with persistent volume claims
-* **MLflow** stores artifacts and metadata on persistent storage
-* No reliance on ephemeral container filesystems
-
-This ensures all critical data persists across pod restarts.
-
----
-
-## Secrets Management
-
-Secrets are created dynamically using:
-
-```
-bash scripts/create-secrets.sh
-```
-
-* Credentials (DB, MinIO) are stored in Kubernetes Secrets
-* No sensitive data is committed to Git
-* `.gitignore` prevents accidental leakage
-
----
-
-## Evidence Collection
-
-To collect system validation evidence:
-
-```
-bash scripts/collect-evidence.sh
-```
-
-This captures:
-
-* Pod status
-* Resource usage (kubectl top)
-* Service availability
-
----
-
-## Teardown
-
-To remove all deployed resources:
-
-```
-bash scripts/teardown.sh
-```
-
----
-
-## Notes
-
-* Designed for **low-scale deployment** (~1–10 users)
-* Resource allocations are based on observed usage in Chameleon
-* Architecture is modular and can be extended with:
-
-  * Horizontal scaling
-  * Ingress-based routing
-  * CI/CD pipelines
-
----
-
-
