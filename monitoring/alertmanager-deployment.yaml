@@ -18,11 +18,14 @@ spec:
           image: prom/alertmanager:v0.27.0
           args:
             - --config.file=/etc/alertmanager/alertmanager.yml
+            - --storage.path=/alertmanager
           ports:
             - containerPort: 9093
           volumeMounts:
             - name: config
               mountPath: /etc/alertmanager
+            - name: storage
+              mountPath: /alertmanager
           resources:
             requests:
               cpu: 25m
@@ -34,6 +37,21 @@ spec:
         - name: config
           configMap:
             name: alertmanager-config
+        - name: storage
+          persistentVolumeClaim:
+            claimName: alertmanager-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-storage
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
 ---
 apiVersion: v1
 kind: Service
